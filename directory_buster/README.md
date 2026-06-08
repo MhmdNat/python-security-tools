@@ -13,6 +13,7 @@ This project was built to explore how modern web enumeration tools operate inter
 - Depth-limited exploration
 - Depth-first traversal using a LIFO queue
 - Thread-safe visited path tracking
+- Timeout handling
 
 ## Usage
 
@@ -28,12 +29,17 @@ python directory_buster.py -u http://example.com -w wordlist.txt --max-depth 5
 
 ### File Extension Brute Forcing
 ```powershell
-python directory_buster.py -u http://example.com -w wordlist.txt -e .php .txt
+python directory_buster.py -u http://example.com/directory -w wordlist.txt -e .php .txt
 ```
 
 ### Custom Match / Filter Codes
 ```powershell
 python directory_buster.py -u http://example.com -w wordlist.txt -mc 200 302 -fc 404
+```
+
+### Custom Timeouts
+```powershell
+python directory_buster.py -u http://example.com -w wordlist.txt --timeout 3
 ```
 
 ## Example Output
@@ -47,7 +53,7 @@ python directory_buster.py -u http://example.com -w wordlist.txt -mc 200 302 -fc
 ## Current Limitations
 
 - Relies primarily on HTTP status codes
-- No content-length or response-body filtering yet
+- No response-body filtering yet
 - No wildcard response detection
 - No rate limiting or retry logic
 - Curl handles are not reused between requests
@@ -55,25 +61,15 @@ python directory_buster.py -u http://example.com -w wordlist.txt -mc 200 302 -fc
 
 ## Future Improvements
 
-- Add content-length and response fingerprint filtering
+- Add response fingerprint filtering
 - Implement wildcard response detection
-- Add request retry and timeout handling
+- Add request retry
 - Support request headers, cookies, and proxies
 - Add rate limiting and throttling
 - Improve connection reuse for performance
 - Add logging and structured output support
 - Explore asynchronous request handling
 
-## Learning Objectives
-
-This project was developed to better understand:
-
-- Python multithreading
-- Recursive traversal algorithms
-- HTTP request/response behavior
-- Web application enumeration techniques
-- Concurrency and synchronization
-- Performance vs accuracy trade-offs in scanning tools
 
 ## Legal Disclaimer
 
