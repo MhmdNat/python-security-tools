@@ -1,7 +1,25 @@
 import json
+import re
 
 from scapy.all import ARP, Ether, conf, get_if_hwaddr, srp, sniff
 from bidict import bidict
+
+import signal
+
+
+SHUTDOWN_REQUESTED = False
+
+def signal_handler(sig, frame):
+    global SHUTDOWN_REQUESTED
+    print("\nCtrl+C detected! Stopping after next packet or timeout...")
+    SHUTDOWN_REQUESTED = True
+
+def should_stop_sniffing(packet):
+    """
+    Scapy checks this on every packet. If True, sniff() exits cleanly.
+    """
+    return SHUTDOWN_REQUESTED
+
 
 def _format_ip_range(ip_range):
     """
@@ -133,19 +151,48 @@ def active_scan(ip_range, json_output_file="active_scan.json"):
     return host_dict
     
 
-def passive_scan(ip_range, json_output_file="passive_scan.json"):
+def passive_scan(ip_range=None, json_output_file="passive_scan.json"):
     """
     Listens for ARP packets on the network to identify active hosts without sending any requests.
     :param ip_range: The IP range to monitor (e.g., '192.168.227.0/24')
     :param json_output_file: The file to save the scan results to
     :returns: A list of active IPs and their MAC addresses observed on the network
     """
-    formatted_ip_range = _format_ip_range(ip_range)
-    interface, _, _ = _get_interface(formatted_ip_range)
+    signal.signal(signal.SIGINT, signal_handler)
+    
+    if ip_range:
+        formatted_ip_range = _format_ip_range(ip_range)
+        interface, _, _ = _get_interface(formatted_ip_range)
+    else:
+        interface = conf.iface  # Use the default interface if no IP range is provided
+
     host_dict = {}
-    sniff(filter="arp", iface=interface, prn=lambda pkt: _process_sniffed_packet(pkt, host_dict, json_output_file), store=0)
-    return
+    with open(json_output_file, 'w') as f:
+        f.write("[")  # Clear the file before writing new data
+
+    sniff(
+        filter="arp", 
+        iface=interface, 
+        prn=lambda pkt: _process_sniffed_packet(
+            pkt, 
+            host_dict, 
+            json_output_file
+            ), 
+        store=0, 
+        stop_filter=should_stop_sniffing)
+    with open(json_output_file, 'a') as f:
+        f.write("]")  # Close the JSON array after sniffing is done
+
+    with open(json_output_file, "r", encoding="utf-8") as file:
+        content = file.read()
+
+    # This regex finds a comma right before a closing bracket ']' or brace '}'
+    # and replaces it, leaving just the bracket/brace.
+    cleaned_content = re.sub(r",\s*([\]}])", r"\1", content)
+    with open(json_output_file, "w", encoding="utf-8") as file:
+        file.write(cleaned_content)
+    
 
 if __name__ == '__main__':
     #active_scan("192.168.227.0/24")
-    passive_scan("192.168.227.0/24")
+    passive_scan()
