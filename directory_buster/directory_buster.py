@@ -39,13 +39,28 @@ visited_lock = Lock()
 
 class RateLimiter:
     def __init__(self, rate_per_second):
-        self.rate_per_second = rate_per_second
+        self.rate_per_second = rate_per_second if rate_per_second > 0 else 1 # Ensure positive rate
         self.max_capacity = max(rate_per_second, 1) # Ensure at least 1 token capacity
         self.requests = self.max_capacity # Initially bucket is full
         self.last_check = time.time()
         self.lock = Lock()
 
 
+    def accquire(self):
+        with self.lock:
+            while True:
+                current_time = time.time()
+                elapsed = current_time - self.last_check
+
+                # The bucket is: at most max capacity, or the number of requests that have been replenished since the last check
+                self.requests = min(self.max_capacity, (self.requests + elapsed * self.rate_per_second))
+                self.last_check = current_time
+
+                if self.requests >= 1:
+                    self.requests -= 1 # reduce number of available requests
+                    return True
+                else:
+                    return False
 class Config:
     url = ""
     wordlist = []
