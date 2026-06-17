@@ -133,15 +133,19 @@ def active_scan(ip_range, json_output_file="active_scan.json"):
     return host_dict
     
 
-def passive_scan(json_output_file="passive_scan.json"):
+def passive_scan(ip_range, json_output_file="passive_scan.json"):
     """
     Listens for ARP packets on the network to identify active hosts without sending any requests.
+    :param ip_range: The IP range to monitor (e.g., '192.168.227.0/24')
+    :param json_output_file: The file to save the scan results to
     :returns: A list of active IPs and their MAC addresses observed on the network
     """
+    formatted_ip_range = _format_ip_range(ip_range)
+    interface, _, _ = _get_interface(formatted_ip_range)
     host_dict = {}
-    sniffed_packets = sniff(filter="arp", prn=lambda pkt: _process_sniffed_packet(pkt, host_dict, json_output_file), store=0)
+    sniff(filter="arp", iface=interface, prn=lambda pkt: _process_sniffed_packet(pkt, host_dict, json_output_file), store=0)
     return
 
 if __name__ == '__main__':
-    active_scan("192.168.227.0/24")
-    #passive_scan()
+    #active_scan("192.168.227.0/24")
+    passive_scan("192.168.227.0/24")
