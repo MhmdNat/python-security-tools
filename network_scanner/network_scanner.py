@@ -80,7 +80,7 @@ def _process_sniffed_packet(packet, host_dict, json_output_file):
 
         if host_dict.get(sender_ip) is None:
             host_dict.update({sender_ip: sender_mac}) 
-            _save_to_json({sender_ip: sender_mac}, json_output_file)
+            _save_pair_to_json({sender_ip: sender_mac}, json_output_file)
 
         return
 
@@ -92,24 +92,30 @@ def _process_sniffed_packet(packet, host_dict, json_output_file):
 
         if host_dict.get(sender_ip) is None:
             host_dict.update({sender_ip: sender_mac})
-            _save_to_json({sender_ip: sender_mac}, json_output_file)
+            _save_pair_to_json({sender_ip: sender_mac}, json_output_file)
 
         if host_dict.get(target_ip) is None:
             host_dict.update({target_ip: target_mac})
-            _save_to_json({target_ip: target_mac}, json_output_file)
+            _save_pair_to_json({target_ip: target_mac}, json_output_file)
         return
 
 
-def _save_to_json(ip_mac_pair, json_output_file):
+def _save_pair_to_json(ip_mac_pair, json_output_file):
     with open(json_output_file, 'a') as f:
         json.dump(ip_mac_pair, f)
         f.write(',\n')  # Write a newline after each JSON object for better readability
 
 
-def active_scan(ip_range):
+def _save_dict_to_json(host_dict, json_output_file):
+    with open(json_output_file, 'w') as f:
+        json.dump(host_dict, f, indent=4)
+
+
+def active_scan(ip_range, json_output_file="active_scan.json"):
     """
     Scans the specified IP range for active hosts using ARP requests.
     :param ip_range: The IP range to scan (e.g., '192.168.27.0/24')
+    :param json_output_file: The file to save the scan results to
     :returns: A list of active IPs and their MAC addresses in the specified IP range
     """
     formatted_ip_range = _format_ip_range(ip_range)
@@ -122,6 +128,8 @@ def active_scan(ip_range):
     answered_list, unanswered_list = srp(arp_request_broadcast, iface=interface, timeout=1, verbose=False)
 
     host_dict = _get_active_hosts(answered_list)
+    host_dict = {ip: mac for ip, mac in host_dict.items() if ip != local_ip}  # Exclude the local IP from the results
+    _save_dict_to_json(host_dict, json_output_file)
     return host_dict
     
 
@@ -135,4 +143,5 @@ def passive_scan(json_output_file="passive_scan.json"):
     return
 
 if __name__ == '__main__':
-    passive_scan()
+    active_scan("192.168.227.0/24")
+    #passive_scan()
