@@ -39,7 +39,7 @@ visited_lock = Lock()
 
 class RateLimiter:
     def __init__(self, rate_per_second):
-        self.rate_per_second = rate_per_second if rate_per_second > 0 else 1 # Ensure positive rate
+        self.rate_per_second = rate_per_second if rate_per_second > 0 else 10 # Ensure positive rate
         self.max_capacity = max(rate_per_second, 1) # Ensure at least 1 token capacity
         self.requests = self.max_capacity # Initially bucket is full
         self.last_check = time.time()
@@ -58,9 +58,14 @@ class RateLimiter:
 
                 if self.requests >= 1:
                     self.requests -= 1 # reduce number of available requests
-                    return True
-                else:
-                    return False
+                    return
+                
+                # calculate approximate wait time
+                wait_time = (1 - self.requests) / self.rate_per_second
+                time.sleep(wait_time)
+                
+                
+
 class Config:
     url = ""
     wordlist = []
@@ -73,6 +78,7 @@ class Config:
     extension = ['']
     connect_timeout = 5
     total_timeout = 10
+    rate_limiter = RateLimiter(60) # default 60 requests per second
 
     @classmethod
     def initialize(cls, args, wordlist_data):
@@ -87,6 +93,7 @@ class Config:
         cls.threads = args.threads
         cls.extension = args.extension 
         cls.connect_timeout, cls.total_timeout = cls._get_curl_timeout_option(args.timeout)
+        cls.rate_limiter = RateLimiter(args.rate_limit)
         print(f'{green}[i]{reset} Configuration: URL={cls.url}, Threads={cls.threads}, Match Codes={cls.match_codes}, Filter Codes={cls.filter_codes}, Match Length={cls.match_length}, Filter Length={cls.filter_length}, Max Depth={cls.max_depth}, Extensions={cls.extension}, Connect Timeout={cls.connect_timeout}ms, Total Timeout={cls.total_timeout}ms')
 
 
@@ -102,6 +109,7 @@ class Config:
 
 def get_status_code_and_length(path : str):
     '''Perform a curl request to the given path appended to base URL.'''
+    Config.rate_limiter.accquire()
     c=pycurl.Curl()
     url = f'{Config.url}{path}'
     c.setopt(c.URL, url)
@@ -197,7 +205,7 @@ def main():
     parser.add_argument('-ml', '--match-length', help='Content length to match (default: any)', type=int, default=-1)
     parser.add_argument('-fl', '--filter-length', help='Content length to filter out (default: any)', type=int, default=-1)
     parser.add_argument('--timeout', help='Timeout for each request in seconds (default: 10)', type=int, default=10)
-
+    parser.add_argument('-rl', '--rate-limit', help='Maximum requests per second (default: 60)', type=int, default=60)
 
     args = parser.parse_args()
 
