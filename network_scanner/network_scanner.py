@@ -1,4 +1,6 @@
-from scapy.all import ARP, Ether, conf, get_if_hwaddr, srp, show_interfaces
+import json
+
+from scapy.all import ARP, Ether, conf, get_if_hwaddr, srp, sniff
 from bidict import bidict
 
 def _format_ip_range(ip_range):
@@ -62,6 +64,48 @@ def _get_active_hosts(answered_list):
     return host_dict
 
 
+def _process_sniffed_packet(packet, host_dict, json_output_file):
+    """
+    Processes a sniffed ARP packet to extract the source IP and MAC address.
+    :param packet: The sniffed ARP packet
+    :param host_dict: The dictionary to store IP-MAC pairs to prevent redundant pairs
+    :param json_output_file: The file to save the JSON output
+    :returns: A list of tuples containing IP and MAC addresses whether packet is an ARP request or reply, otherwise None
+    """
+    print("Got an arp packet")
+    packet.summary()
+    if packet.haslayer(ARP) and packet[ARP].op == 1:  # ARP request (whohas)
+        sender_mac = packet[ARP].hwsrc
+        sender_ip = packet[ARP].psrc
+
+        if host_dict.get(sender_ip) is None:
+            host_dict.update({sender_ip: sender_mac}) 
+            _save_to_json({sender_ip: sender_mac}, json_output_file)
+
+        return
+
+    if packet.haslayer(ARP) and packet[ARP].op == 2:  # ARP reply (is-at)
+        sender_mac = packet[ARP].hwsrc
+        sender_ip = packet[ARP].psrc
+        target_mac = packet[ARP].hwdst
+        target_ip = packet[ARP].pdst
+
+        if host_dict.get(sender_ip) is None:
+            host_dict.update({sender_ip: sender_mac})
+            _save_to_json({sender_ip: sender_mac}, json_output_file)
+
+        if host_dict.get(target_ip) is None:
+            host_dict.update({target_ip: target_mac})
+            _save_to_json({target_ip: target_mac}, json_output_file)
+        return
+
+
+def _save_to_json(ip_mac_pair, json_output_file):
+    with open(json_output_file, 'a') as f:
+        json.dump(ip_mac_pair, f)
+        f.write(',\n')  # Write a newline after each JSON object for better readability
+
+
 def active_scan(ip_range):
     """
     Scans the specified IP range for active hosts using ARP requests.
@@ -77,8 +121,18 @@ def active_scan(ip_range):
     arp_request_broadcast = ether / arp
     answered_list, unanswered_list = srp(arp_request_broadcast, iface=interface, timeout=1, verbose=False)
 
-    return _get_active_hosts(answered_list)
+    host_dict = _get_active_hosts(answered_list)
+    return host_dict
     
 
+def passive_scan(json_output_file="passive_scan.json"):
+    """
+    Listens for ARP packets on the network to identify active hosts without sending any requests.
+    :returns: A list of active IPs and their MAC addresses observed on the network
+    """
+    host_dict = {}
+    sniffed_packets = sniff(filter="arp", prn=lambda pkt: _process_sniffed_packet(pkt, host_dict, json_output_file), store=0)
+    return
+
 if __name__ == '__main__':
-    active_scan('192.168.227.0/24')
+    passive_scan()
