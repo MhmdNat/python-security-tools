@@ -1,4 +1,4 @@
-import scapy
+from scapy.all import ARP, Ether, conf, get_if_hwaddr, srp, show_interfaces
 
 
 def _format_ip_range(ip_range):
@@ -29,3 +29,18 @@ def _format_ip_range(ip_range):
         raise ValueError("Invalid subnet mask. Please provide a valid subnet mask (e.g., '24').")
     
     return f"{subnet_range}/{subnet_mask}"
+
+
+
+def _get_interface(formatted_ip_range):
+    
+    base_ip = formatted_ip_range.split('/')[0]
+
+    try:
+        interface, local_ip, gateway = conf.route.route(base_ip)
+        print(f"Found best matching route through interface IP {local_ip} with MAC address {get_if_hwaddr(interface)}")
+        return interface, local_ip, gateway
+    except Exception as e:
+        print(f"Error: Could not resolve a route to {base_ip}. Details: {e}")
+        raise
+
