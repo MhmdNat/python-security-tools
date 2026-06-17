@@ -22,6 +22,7 @@ Muhammad Al Natour
 """
 
 import argparse
+import time
 import pycurl 
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
@@ -34,6 +35,16 @@ reset = '\033[0m'
 path_stack = LifoQueue()
 visited = set()
 visited_lock = Lock()
+
+
+class RateLimiter:
+    def __init__(self, rate_per_second):
+        self.rate_per_second = rate_per_second
+        self.max_capacity = max(rate_per_second, 1) # Ensure at least 1 token capacity
+        self.requests = self.max_capacity # Initially bucket is full
+        self.last_check = time.time()
+        self.lock = Lock()
+
 
 class Config:
     url = ""
